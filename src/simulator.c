@@ -1,5 +1,6 @@
 #include "simulator.h"
 
+#include "memory.h"
 #include "process.h"
 
 #include <stdio.h>
@@ -20,6 +21,11 @@ int simulator_run(SimMode mode, const char *input_path)
     }
 
     printf("Simulador single-thread iniciado com %zu processo(s).\n", processes.count);
+
+    MemoryManager memory;
+    memory_init(&memory, SYSTEM_MEMORY_MB);
+    memory_print(&memory);
+    memory_destroy(&memory);
 
     process_list_destroy(&processes);
     return 0;
