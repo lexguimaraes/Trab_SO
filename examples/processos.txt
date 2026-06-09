@@ -1,5 +1,7 @@
-# Formato:
-# id prioridade chegada cpu1 io cpu2 memoria_mb discos
-7 1 0 4 2 4 800 1
-12 1 0 10 4 8 1200 1
-5 0 1 15 0 0 512 0
+# Formato oficial: [id, cpu1, io, cpu2, memoria_mb]
+[7, 4, 2, 4, 800]
+[12, 10, 4, 8, 1200]
+[5, 15, 0, 0, 512]
+
+# Formato com prioridade: id prioridade cpu1 io cpu2 memoria_mb
+21 0 3 0 0 512
