@@ -10,6 +10,12 @@ multi-thread.
 make
 ```
 
+Para gerar metadados para `clangd`/LSP:
+
+```sh
+make compile_commands
+```
+
 ## Execução
 
 ```sh
