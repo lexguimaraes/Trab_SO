@@ -3,12 +3,16 @@ CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -g -Iinclude
 LDFLAGS :=
 
 SRC := $(wildcard src/*.c)
+HEADERS := $(wildcard include/*.h)
+COMPILE_DB_FILES := $(SRC) $(HEADERS)
 OBJ := $(SRC:.c=.o)
 BIN := simulador
 
 .PHONY: all clean run compile_commands
 
 all: $(BIN)
+
+$(BIN): | compile_commands
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)
@@ -21,16 +25,21 @@ run: $(BIN)
 
 compile_commands:
 	@printf '[\n' > compile_commands.json
-	@for file in $(SRC); do \
+	@first=1; \
+	for file in $(COMPILE_DB_FILES); do \
+		if [ $$first -eq 0 ]; then \
+			printf ',\n' >> compile_commands.json; \
+		fi; \
+		first=0; \
+		case "$$file" in \
+			*.h) command='$(CC) $(CFLAGS) -x c-header -c '"$$file"' -o /tmp/'"$$(basename "$$file")"'.o' ;; \
+			*) command='$(CC) $(CFLAGS) -c '"$$file"' -o '"$${file%.c}"'.o' ;; \
+		esac; \
 		printf '  {\n' >> compile_commands.json; \
 		printf '    "directory": "%s",\n' "$$(pwd)" >> compile_commands.json; \
-		printf '    "command": "$(CC) $(CFLAGS) -c %s -o %s",\n' "$$file" "$${file%.c}.o" >> compile_commands.json; \
+		printf '    "command": "%s",\n' "$$command" >> compile_commands.json; \
 		printf '    "file": "%s"\n' "$$file" >> compile_commands.json; \
-		if [ "$$file" = "$$(printf "%s\n" $(SRC) | tail -n 1)" ]; then \
-			printf '  }\n' >> compile_commands.json; \
-		else \
-			printf '  },\n' >> compile_commands.json; \
-		fi; \
+		printf '  }\n' >> compile_commands.json; \
 	done
 	@printf ']\n' >> compile_commands.json
 

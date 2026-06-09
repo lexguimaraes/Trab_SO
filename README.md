@@ -10,7 +10,8 @@ multi-thread.
 make
 ```
 
-Para gerar metadados para `clangd`/LSP:
+O build também regenera automaticamente `compile_commands.json` para
+`clangd`/LSP. Para atualizar apenas esse arquivo:
 
 ```sh
 make compile_commands
