@@ -134,14 +134,14 @@ void memory_release(MemoryManager *memory, int pid)
 
 void memory_print(const MemoryManager *memory)
 {
-    printf("Memoria:");
+    printf("  Memoria");
     for (size_t i = 0; i < memory->count; i++) {
         const MemoryBlock *block = &memory->blocks[i];
         if (block->free) {
-            printf(" [%d,%d livre]", block->base, block->size);
+            printf(" | base=%-5d tam=%-5d livre", block->base, block->size);
         } else {
-            printf(" [%d,%d P%d]", block->base, block->size, block->pid);
+            printf(" | base=%-5d tam=%-5d P%-3d", block->base, block->size, block->pid);
         }
     }
-    printf("\n");
+    printf(" |\n");
 }
