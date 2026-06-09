@@ -17,6 +17,42 @@ O build também regenera automaticamente `compile_commands.json` para
 make compile_commands
 ```
 
+## Comandos Make
+
+```sh
+make
+```
+
+Compila o projeto e gera o executavel `simulador`. Tambem atualiza
+`compile_commands.json` antes do build.
+
+```sh
+make simulador
+```
+
+Compila diretamente o alvo do binario. Na pratica, hoje tem o mesmo efeito de
+`make`.
+
+```sh
+make run
+```
+
+Compila o projeto, se necessario, e executa o simulador em modo `single` usando
+`examples/processos.txt`.
+
+```sh
+make compile_commands
+```
+
+Regenera apenas o `compile_commands.json`, usado pelo `clangd`/LSP para
+entender flags como `-std=c11` e `-Iinclude`.
+
+```sh
+make clean
+```
+
+Remove o binario `simulador` e os arquivos objeto `src/*.o`.
+
 ## Execução
 
 ```sh
