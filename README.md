@@ -41,6 +41,13 @@ Compila o projeto, se necessario, e executa o simulador em modo `single` usando
 `examples/processos.txt`.
 
 ```sh
+make report
+```
+
+Compila o projeto, se necessario, executa o simulador em modo `single` e gera o
+relatorio HTML `resultado.html`.
+
+```sh
 make compile_commands
 ```
 
@@ -57,6 +64,12 @@ Remove o binario `simulador` e os arquivos objeto `src/*.o`.
 
 ```sh
 ./simulador --modo single examples/processos.txt
+```
+
+Para gerar um relatorio HTML:
+
+```sh
+./simulador --modo single examples/processos.txt --html resultado.html
 ```
 
 ## Entrada

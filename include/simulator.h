@@ -11,6 +11,6 @@ typedef enum {
     SIM_MODE_MULTI
 } SimMode;
 
-int simulator_run(SimMode mode, const char *input_path);
+int simulator_run(SimMode mode, const char *input_path, const char *html_path);
 
 #endif
