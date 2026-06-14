@@ -33,6 +33,11 @@ typedef struct {
     int reserved_disks;
 } SingleThreadSystem;
 
+typedef struct {
+    SingleThreadSystem *system;
+    ProcessList *processes;
+} Dispatcher;
+
 static const char *priority_name(ProcessPriority priority)
 {
     return priority == PROCESS_REAL_TIME ? "RT" : "USER";
@@ -325,8 +330,16 @@ static void set_state(SingleThreadSystem *system, int time, Process *process, Pr
     }
 }
 
-static int enqueue_ready(SingleThreadSystem *system, Process *process)
+static void dispatcher_init(Dispatcher *dispatcher, SingleThreadSystem *system, ProcessList *processes)
 {
+    dispatcher->system = system;
+    dispatcher->processes = processes;
+}
+
+static int dispatcher_enqueue_ready(Dispatcher *dispatcher, Process *process)
+{
+    SingleThreadSystem *system = dispatcher->system;
+
     if (process->priority == PROCESS_REAL_TIME) {
         return queue_push(&system->real_time_ready, process);
     }
@@ -339,8 +352,9 @@ static int enqueue_ready(SingleThreadSystem *system, Process *process)
     return queue_push(&system->user_ready[process->feedback_level], process);
 }
 
-static Process *pop_next_ready(SingleThreadSystem *system)
+static Process *dispatcher_pop_next_ready(Dispatcher *dispatcher)
 {
+    SingleThreadSystem *system = dispatcher->system;
     Process *process = queue_pop(&system->real_time_ready);
     if (process != NULL) {
         return process;
@@ -413,8 +427,11 @@ static void destroy_system(SingleThreadSystem *system)
     memory_destroy(&system->memory);
 }
 
-static void admit_processes(SingleThreadSystem *system, ProcessList *processes, int time)
+static void dispatcher_admit_processes(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+    ProcessList *processes = dispatcher->processes;
+
     for (size_t i = 0; i < processes->count; i++) {
         Process *process = &processes->items[i];
         if (process->state != PROCESS_NEW || process->arrival_time > time) {
@@ -454,7 +471,7 @@ static void admit_processes(SingleThreadSystem *system, ProcessList *processes, 
         html_event(system->report, time, "criacao", process->id, message);
         set_state(system, time, process, PROCESS_READY);
 
-        if (enqueue_ready(system, process) != 0) {
+        if (dispatcher_enqueue_ready(dispatcher, process) != 0) {
             fprintf(stderr, "Erro ao enfileirar P%d.\n", process->id);
             complete_process(system, time, process);
         }
@@ -472,8 +489,10 @@ static int count_free_cpus(const SingleThreadSystem *system)
     return count;
 }
 
-static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
+static void dispatcher_preempt_for_real_time(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     while ((size_t)count_free_cpus(system) < system->real_time_ready.count) {
         int selected_cpu = -1;
         int selected_feedback_level = -1;
@@ -497,7 +516,7 @@ static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
         Process *process = system->cpus[selected_cpu].process;
         system->cpus[selected_cpu].process = NULL;
         set_state(system, time, process, PROCESS_READY);
-        if (enqueue_ready(system, process) != 0) {
+        if (dispatcher_enqueue_ready(dispatcher, process) != 0) {
             fprintf(stderr, "Erro ao reenfileirar P%d apos preempcao.\n", process->id);
             complete_process(system, time, process);
             return;
@@ -514,8 +533,10 @@ static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
     }
 }
 
-static void start_io(SingleThreadSystem *system, int time)
+static void dispatcher_start_io(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     for (int disk = 0; disk < SYSTEM_DISK_COUNT; disk++) {
         if (system->disks[disk].process != NULL) {
             continue;
@@ -538,14 +559,16 @@ static void start_io(SingleThreadSystem *system, int time)
     }
 }
 
-static void dispatch_cpus(SingleThreadSystem *system, int time)
+static void dispatcher_dispatch_cpus(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
         if (system->cpus[cpu].process != NULL) {
             continue;
         }
 
-        Process *process = pop_next_ready(system);
+        Process *process = dispatcher_pop_next_ready(dispatcher);
         if (process == NULL) {
             return;
         }
@@ -584,8 +607,10 @@ static void dispatch_cpus(SingleThreadSystem *system, int time)
     }
 }
 
-static void finish_cpu_phase(SingleThreadSystem *system, int time, int cpu, Process *process)
+static void finish_cpu_phase(Dispatcher *dispatcher, int time, int cpu, Process *process)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     system->cpus[cpu].process = NULL;
 
     if (process->phase == PHASE_CPU1 && process->io_time > 0) {
@@ -604,15 +629,17 @@ static void finish_cpu_phase(SingleThreadSystem *system, int time, int cpu, Proc
         process->remaining_time = process->cpu2_time;
         process->quantum_remaining = USER_QUANTUM;
         set_state(system, time, process, PROCESS_READY);
-        enqueue_ready(system, process);
+        dispatcher_enqueue_ready(dispatcher, process);
         return;
     }
 
     complete_process(system, time, process);
 }
 
-static void tick_cpus(SingleThreadSystem *system, int time)
+static void tick_cpus(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
         Process *process = system->cpus[cpu].process;
         if (process == NULL) {
@@ -625,7 +652,7 @@ static void tick_cpus(SingleThreadSystem *system, int time)
         }
 
         if (process->remaining_time <= 0) {
-            finish_cpu_phase(system, time + 1, cpu, process);
+            finish_cpu_phase(dispatcher, time + 1, cpu, process);
             continue;
         }
 
@@ -636,13 +663,15 @@ static void tick_cpus(SingleThreadSystem *system, int time)
             }
             process->quantum_remaining = USER_QUANTUM;
             set_state(system, time + 1, process, PROCESS_READY);
-            enqueue_ready(system, process);
+            dispatcher_enqueue_ready(dispatcher, process);
         }
     }
 }
 
-static void tick_disks(SingleThreadSystem *system, int time)
+static void tick_disks(Dispatcher *dispatcher, int time)
 {
+    SingleThreadSystem *system = dispatcher->system;
+
     for (int disk = 0; disk < SYSTEM_DISK_COUNT; disk++) {
         Process *process = system->disks[disk].process;
         if (process == NULL) {
@@ -660,7 +689,7 @@ static void tick_disks(SingleThreadSystem *system, int time)
             process->remaining_time = process->cpu2_time;
             process->quantum_remaining = USER_QUANTUM;
             set_state(system, time + 1, process, PROCESS_READY);
-            enqueue_ready(system, process);
+            dispatcher_enqueue_ready(dispatcher, process);
         } else {
             complete_process(system, time + 1, process);
         }
@@ -726,6 +755,8 @@ static int run_single(ProcessList *processes, const char *html_path)
         fprintf(stderr, "Erro ao inicializar memoria do sistema.\n");
         return 1;
     }
+    Dispatcher dispatcher;
+    dispatcher_init(&dispatcher, &system, processes);
 
     HtmlReport report = {
         .file = NULL,
@@ -749,15 +780,15 @@ static int run_single(ProcessList *processes, const char *html_path)
         printf("Ciclo %d: t=%03d -> t=%03d\n", time, time, time + 1);
         print_rule();
         html_cycle_begin(system.report, time);
-        admit_processes(&system, processes, time);
-        start_io(&system, time);
-        preempt_user_for_real_time(&system, time);
-        dispatch_cpus(&system, time);
+        dispatcher_admit_processes(&dispatcher, time);
+        dispatcher_start_io(&dispatcher, time);
+        dispatcher_preempt_for_real_time(&dispatcher, time);
+        dispatcher_dispatch_cpus(&dispatcher, time);
         print_resources(&system, time);
         print_queues(&system);
         memory_print(&system.memory);
-        tick_cpus(&system, time);
-        tick_disks(&system, time);
+        tick_cpus(&dispatcher, time);
+        tick_disks(&dispatcher, time);
         html_snapshot(system.report, &system, time + 1);
         html_cycle_end(system.report);
         time++;

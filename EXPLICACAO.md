@@ -463,20 +463,32 @@ A estrutura principal é `SingleThreadSystem`, que agrupa:
 - ponteiro opcional para o relatório HTML;
 - contador de processos finalizados.
 
+O `Dispatcher` agrupa a lógica de despacho do simulador. Ele não é uma thread
+separada; é uma estrutura que aponta para o estado do sistema e para a lista de
+processos carregados. Suas funções concentram as decisões de admissão,
+preempção por tempo real, início de I/O e despacho para CPU:
+
+- `dispatcher_admit_processes`: admite processos que já chegaram, reservando
+  memória e discos antes de colocá-los na fila de prontos;
+- `dispatcher_preempt_for_real_time`: libera CPU para tempo real, preemptando o
+  usuário em execução com menor prioridade de feedback;
+- `dispatcher_dispatch_cpus`: move processos prontos para CPUs livres;
+- `dispatcher_start_io`: move processos aguardando I/O para discos livres.
+
 O loop principal fica em `run_single`:
 
 ```c
 while (system.finished_count < (int)processes->count) {
     html_cycle_begin(system.report, time);
-    admit_processes(&system, processes, time);
-    start_io(&system, time);
-    preempt_user_for_real_time(&system, time);
-    dispatch_cpus(&system, time);
+    dispatcher_admit_processes(&dispatcher, time);
+    dispatcher_start_io(&dispatcher, time);
+    dispatcher_preempt_for_real_time(&dispatcher, time);
+    dispatcher_dispatch_cpus(&dispatcher, time);
     print_resources(&system, time);
     print_queues(&system);
     memory_print(&system.memory);
-    tick_cpus(&system, time);
-    tick_disks(&system, time);
+    tick_cpus(&dispatcher, time);
+    tick_disks(&dispatcher, time);
     html_snapshot(system.report, &system, time + 1);
     html_cycle_end(system.report);
     time++;
