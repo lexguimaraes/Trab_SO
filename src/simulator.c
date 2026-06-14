@@ -476,11 +476,17 @@ static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
 {
     while ((size_t)count_free_cpus(system) < system->real_time_ready.count) {
         int selected_cpu = -1;
-        for (int cpu = SYSTEM_CPU_COUNT - 1; cpu >= 0; cpu--) {
+        int selected_feedback_level = -1;
+        for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
             Process *process = system->cpus[cpu].process;
-            if (process != NULL && process->priority == PROCESS_USER) {
+            if (process == NULL || process->priority != PROCESS_USER) {
+                continue;
+            }
+
+            if (process->feedback_level > selected_feedback_level ||
+                (process->feedback_level == selected_feedback_level && cpu > selected_cpu)) {
                 selected_cpu = cpu;
-                break;
+                selected_feedback_level = process->feedback_level;
             }
         }
 
@@ -497,11 +503,12 @@ static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
             return;
         }
 
-        char message[96];
+        char message[160];
         snprintf(message,
                  sizeof(message),
-                 "cpu%d liberada para processo de tempo real",
-                 selected_cpu);
+                 "cpu%d liberada para tempo real; usuario%d e a menor prioridade em execucao; empate por maior cpu",
+                 selected_cpu,
+                 selected_feedback_level);
         print_event(time, "preempcao", process->id, message);
         html_event(system->report, time, "preempcao", process->id, message);
     }
