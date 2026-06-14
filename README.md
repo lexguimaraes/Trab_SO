@@ -46,6 +46,13 @@ make run_basic
 Executa o caso pequeno em `examples/processos_basico.txt`.
 
 ```sh
+make run_official
+```
+
+Executa uma carga grande com prioridade explícita em
+`examples/processos_oficial.txt`.
+
+```sh
 make report
 ```
 
@@ -57,6 +64,12 @@ make report_basic
 ```
 
 Gera o relatorio HTML para o caso pequeno em `examples/processos_basico.txt`.
+
+```sh
+make report_official
+```
+
+Gera o relatorio HTML para a carga grande com prioridade explícita.
 
 ```sh
 make compile_commands
@@ -102,6 +115,10 @@ id prioridade chegada cpu1 io cpu2 memoria_mb discos
 ```
 
 Prioridade `0` representa tempo real; prioridade `1` representa usuário.
+
+O arquivo `examples/processos_oficial.txt` usa o primeiro formato estendido,
+com prioridade explícita, chegada padrão em `0` e discos inferidos pelo valor de
+`io`.
 
 No formato estendido, `discos` representa recursos reservados pelo despachante
 durante toda a vida do processo. Um processo com I/O deve solicitar ao menos 1
