@@ -128,6 +128,13 @@ No formato estendido, `discos` representa recursos reservados pelo despachante
 durante toda a vida do processo. Um processo com I/O deve solicitar ao menos 1
 disco. Processos de tempo real usam apenas CPU e memoria, com limite de 512 MiB.
 
+Chegada e admissão são momentos diferentes. A chegada indica quando o processo
+passa a ser candidato; a admissão só ocorre quando há memória e discos
+suficientes para reservar. Enquanto isso não acontece, o processo permanece em
+`NEW` e aparece na fila `admissao` dos snapshots com o motivo da espera. No HTML,
+`proximo-ciclo` indica que os recursos já foram liberados no fim do ciclo e a
+admissão será reavaliada no início do próximo.
+
 ## Estado Atual
 
 Implementado:
@@ -140,7 +147,7 @@ Implementado:
   por usuários;
 - reserva exclusiva de discos durante a execução dos processos que os solicitaram;
 - memória por blocos com first-fit e junção de blocos livres;
-- logs de criação, despacho, bloqueio, preempção e finalização.
+- logs de admissão, despacho, bloqueio, preempção e finalização.
 
 ## Threads
 

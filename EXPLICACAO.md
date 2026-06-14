@@ -17,7 +17,7 @@ O simulador modela, de forma discreta, um sistema com:
 - fases de execução `CPU1`, `IO` e `CPU2`;
 - reserva exclusiva de discos solicitados pelos processos;
 - alocação real de memória por blocos, com endereço base e tamanho;
-- logs de criação, despacho, bloqueio, preempção, finalização e mapa de memória;
+- logs de admissão, despacho, bloqueio, preempção, finalização e mapa de memória;
 - relatório HTML opcional em `resultado.html`.
 
 O tempo avança em unidades inteiras. Em cada unidade de tempo, o simulador admite
@@ -175,6 +175,15 @@ reservados exclusivamente pelo processo durante toda a execução. Um processo c
 I/O precisa solicitar ao menos 1 disco. A admissão de processos espera até haver
 memória e discos suficientes.
 
+Chegada e admissão não são a mesma coisa. A chegada é o instante em que o
+processo passa a ser candidato à entrada no sistema. A admissão é o instante em
+que o dispatcher consegue reservar memória e discos para ele. Se um processo já
+chegou, mas ainda não há recursos suficientes, ele permanece em `NEW` e aparece
+nos snapshots na fila `admissao`, com o motivo da espera: `memoria`, `discos` ou
+`memoria+discos`. No relatório HTML, também pode aparecer `proximo-ciclo` quando
+os recursos foram liberados no fim do ciclo atual e o processo será reavaliado
+na próxima admissão.
+
 Processos de tempo real são validados com limite máximo de 512 MiB de memória e
 não podem solicitar I/O, segunda fase de CPU ou discos.
 
@@ -187,7 +196,7 @@ A saída padrão no terminal é um log textual da simulação. Um trecho típico
 Ciclo 0: t=000 -> t=001
 -------------------------------------------------------------------------------
   t=000 | estado    | P7   | NEW        -> READY      | fase=CPU1 restante=4
-  t=000 | criacao   | P7   | base=512   tamanho=800   MiB discos=1 prioridade=USER
+  t=000 | admissao  | P7   | base=512   tamanho=800   MiB discos=1 prioridade=USER
   t=000 | estado    | P7   | READY      -> RUNNING    | fase=CPU1 restante=4
   t=000 | despacho  | P7   | cpu2 fila=0 quantum=2
 ```
@@ -237,6 +246,7 @@ O relatório mostra:
 - snapshot das CPUs;
 - snapshot dos discos;
 - tamanho e PIDs das filas;
+- processos pendentes de admissão e o recurso que falta;
 - barra visual da memória por blocos;
 - tabela final com os processos e seus estados finais.
 
@@ -297,6 +307,8 @@ Discos são tratados em dois níveis:
 
 A reserva impede que mais de 4 discos sejam comprometidos ao mesmo tempo, mesmo
 quando alguns processos reservados ainda não estão executando I/O naquele ciclo.
+Se todos os discos já estão reservados, um novo processo que solicita disco
+continua em `NEW` até que alguma reserva seja liberada por finalização.
 
 O gerenciador mantém uma lista dinâmica de blocos:
 
@@ -436,6 +448,10 @@ A fila é usada para:
 - três filas de usuário;
 - fila de processos aguardando I/O.
 
+A fila de admissão é implícita: ela é formada pelos processos ainda em `NEW`
+cujo tempo de chegada já passou. Ela não precisa de uma `ProcessQueue` própria,
+porque o dispatcher reavalia a lista de processos carregados a cada ciclo.
+
 ### `include/memory.h` E `src/memory.c`
 
 Implementam o gerenciador de memória por blocos.
@@ -471,7 +487,8 @@ processos carregados. Suas funções concentram as decisões de admissão,
 preempção por tempo real, início de I/O e despacho para CPU:
 
 - `dispatcher_admit_processes`: admite processos que já chegaram, reservando
-  memória e discos antes de colocá-los na fila de prontos;
+  memória e discos antes de colocá-los na fila de prontos; se algum recurso
+  falta, eles permanecem em `NEW` e aparecem como pendentes de admissão;
 - `dispatcher_preempt_for_real_time`: libera CPU para tempo real, preemptando o
   usuário em execução com menor prioridade de feedback;
 - `dispatcher_dispatch_cpus`: move processos prontos para CPUs livres;
@@ -487,7 +504,7 @@ while (system.finished_count < (int)processes->count) {
     dispatcher_preempt_for_real_time(&dispatcher, time);
     dispatcher_dispatch_cpus(&dispatcher, time);
     print_resources(&system, time);
-    print_queues(&system);
+    print_queues(&system, processes, time);
     memory_print(&system.memory);
     tick_cpus(&dispatcher, time);
     tick_disks(&dispatcher, time);
@@ -520,7 +537,11 @@ O fluxo geral é:
 ```text
 NEW
   |
-  | chegada + memória e discos disponíveis
+  | chegada, mas falta memória ou disco
+  v
+NEW (pendente em admissao)
+  |
+  | memória e discos disponíveis
   v
 READY
   |

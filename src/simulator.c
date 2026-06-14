@@ -220,7 +220,72 @@ static void html_queue_members(HtmlReport *report, const char *name, const Proce
     fprintf(report->file, "</span>\n");
 }
 
-static void html_snapshot(HtmlReport *report, const SingleThreadSystem *system, int time)
+static int memory_has_available_block(const MemoryManager *memory, int size)
+{
+    for (size_t i = 0; i < memory->count; i++) {
+        const MemoryBlock *block = &memory->blocks[i];
+        if (block->free && block->size >= size) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static const char *admission_pending_reason(const SingleThreadSystem *system, const Process *process)
+{
+    int waiting_disks = system->reserved_disks + process->requested_disks > SYSTEM_DISK_COUNT;
+    int waiting_memory = !memory_has_available_block(&system->memory, process->memory_mb);
+
+    if (waiting_memory && waiting_disks) {
+        return "memoria+discos";
+    }
+    if (waiting_memory) {
+        return "memoria";
+    }
+    if (waiting_disks) {
+        return "discos";
+    }
+    return "proximo-ciclo";
+}
+
+static void html_admission_pending(HtmlReport *report,
+                                   const SingleThreadSystem *system,
+                                   const ProcessList *processes,
+                                   int time)
+{
+    size_t pending_count = 0;
+    for (size_t i = 0; i < processes->count; i++) {
+        const Process *process = &processes->items[i];
+        if (process->state == PROCESS_NEW && process->arrival_time <= time) {
+            pending_count++;
+        }
+    }
+
+    fprintf(report->file, "      <span class=\"queue\">admissao: %zu<br>", pending_count);
+    if (pending_count == 0) {
+        fprintf(report->file, "-");
+    } else {
+        int first = 1;
+        for (size_t i = 0; i < processes->count; i++) {
+            const Process *process = &processes->items[i];
+            if (process->state != PROCESS_NEW || process->arrival_time > time) {
+                continue;
+            }
+            fprintf(report->file,
+                    "%sP%d(%s)",
+                    first ? "" : " ",
+                    process->id,
+                    admission_pending_reason(system, process));
+            first = 0;
+        }
+    }
+    fprintf(report->file, "</span>\n");
+}
+
+static void html_snapshot(HtmlReport *report,
+                          const SingleThreadSystem *system,
+                          const ProcessList *processes,
+                          int time)
 {
     if (report == NULL || report->file == NULL) {
         return;
@@ -266,6 +331,7 @@ static void html_snapshot(HtmlReport *report, const SingleThreadSystem *system, 
     html_queue_members(report, "usuario1", &system->user_ready[1]);
     html_queue_members(report, "usuario2", &system->user_ready[2]);
     html_queue_members(report, "io", &system->io_waiting);
+    html_admission_pending(report, system, processes, time);
 
     fprintf(report->file,
             "      <span class=\"queue\">discos reservados: %d/%d</span>\n"
@@ -561,7 +627,7 @@ static void dispatcher_admit_processes(Dispatcher *dispatcher, int time)
         process->quantum_remaining = USER_QUANTUM;
         printf("  t=%03d | %-9s | P%-3d | base=%-5d tamanho=%-5d MiB discos=%d prioridade=%s\n",
                time,
-               "criacao",
+               "admissao",
                process->id,
                process->memory_base,
                process->memory_mb,
@@ -575,7 +641,7 @@ static void dispatcher_admit_processes(Dispatcher *dispatcher, int time)
                  process->memory_mb,
                  process->disks_reserved,
                  priority_name(process->priority));
-        html_event(system->report, time, "criacao", process->id, message);
+        html_event(system->report, time, "admissao", process->id, message);
         set_state(system, time, process, PROCESS_READY);
 
         if (dispatcher_enqueue_ready(dispatcher, process) != 0) {
@@ -845,7 +911,34 @@ static void print_queue_members(const char *name, const ProcessQueue *queue)
     printf("\n");
 }
 
-static void print_queues(const SingleThreadSystem *system)
+static void print_admission_pending(const SingleThreadSystem *system,
+                                    const ProcessList *processes,
+                                    int time)
+{
+    size_t pending_count = 0;
+    for (size_t i = 0; i < processes->count; i++) {
+        const Process *process = &processes->items[i];
+        if (process->state == PROCESS_NEW && process->arrival_time <= time) {
+            pending_count++;
+        }
+    }
+
+    printf("  %-11s (%zu):", "admissao", pending_count);
+    if (pending_count == 0) {
+        printf(" -");
+    } else {
+        for (size_t i = 0; i < processes->count; i++) {
+            const Process *process = &processes->items[i];
+            if (process->state != PROCESS_NEW || process->arrival_time > time) {
+                continue;
+            }
+            printf(" P%d(%s)", process->id, admission_pending_reason(system, process));
+        }
+    }
+    printf("\n");
+}
+
+static void print_queues(const SingleThreadSystem *system, const ProcessList *processes, int time)
 {
     printf("  Filas\n");
     print_queue_members("tempo-real", &system->real_time_ready);
@@ -853,6 +946,7 @@ static void print_queues(const SingleThreadSystem *system)
     print_queue_members("usuario1", &system->user_ready[1]);
     print_queue_members("usuario2", &system->user_ready[2]);
     print_queue_members("io", &system->io_waiting);
+    print_admission_pending(system, processes, time);
 }
 
 static int run_single(ProcessList *processes, const char *html_path)
@@ -892,11 +986,11 @@ static int run_single(ProcessList *processes, const char *html_path)
         dispatcher_preempt_for_real_time(&dispatcher, time);
         dispatcher_dispatch_cpus(&dispatcher, time);
         print_resources(&system, time);
-        print_queues(&system);
+        print_queues(&system, processes, time);
         memory_print(&system.memory);
         tick_cpus(&dispatcher, time);
         tick_disks(&dispatcher, time);
-        html_snapshot(system.report, &system, time + 1);
+        html_snapshot(system.report, &system, processes, time + 1);
         html_cycle_end(system.report);
         time++;
     }
