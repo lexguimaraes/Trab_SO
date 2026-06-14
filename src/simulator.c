@@ -59,51 +59,65 @@ static void html_write_header(HtmlReport *report, const ProcessList *processes)
         return;
     }
 
+    fputs("<!doctype html>\n"
+          "<html lang=\"pt-BR\">\n"
+          "<head>\n"
+          "  <meta charset=\"utf-8\">\n"
+          "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+          "  <title>Resultado da Simulacao</title>\n"
+          "  <style>\n"
+          "    :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --line:#d9dee7; --text:#172033; --muted:#667085; --accent:#1f6feb; --ok:#1a7f37; --warn:#b45309; --rt:#7c3aed; --user:#0f766e; }\n"
+          "    * { box-sizing: border-box; }\n"
+          "    body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); }\n"
+          "    header { position: sticky; top: 0; z-index: 2; background: #101828; color: white; padding: 18px 28px; box-shadow: 0 2px 12px rgba(15,23,42,.2); }\n"
+          "    h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: 0; }\n"
+          "    h2 { margin: 0 0 14px; font-size: 18px; }\n"
+          "    h3 { margin: 18px 0 8px; font-size: 14px; color: var(--muted); text-transform: uppercase; }\n"
+          "    main { padding: 24px 28px 40px; max-width: 1280px; margin: 0 auto; }\n"
+          "    .summary { display: flex; flex-wrap: wrap; gap: 10px; }\n"
+          "    .pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: #e5e7eb; }\n",
+          report->file);
+    fputs("    .controls { position: sticky; top: 92px; z-index: 1; display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 14px; margin:0 0 18px; background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:8px; box-shadow:0 1px 8px rgba(15,23,42,.08); }\n"
+          "    .control-group { display:flex; align-items:center; gap:6px; }\n"
+          "    button, select { height:32px; border:1px solid #cfd6e2; border-radius:6px; background:#fff; color:var(--text); font:inherit; font-weight:700; }\n"
+          "    button { min-width:34px; padding:0 10px; cursor:pointer; }\n"
+          "    button:hover { border-color:#9db7df; background:#f7fbff; }\n"
+          "    button.active { background:#e8f1ff; border-color:#8bbcff; color:#0b4a8b; }\n"
+          "    select { padding:0 8px; }\n"
+          "    input[type=range] { width:min(360px, 42vw); accent-color:var(--accent); }\n"
+          "    .cycle-readout { min-width:132px; font-weight:800; }\n"
+          "    .cycle { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 18px; overflow: hidden; }\n"
+          "    .cycle[hidden] { display:none; }\n"
+          "    .cycle-title { display:flex; justify-content:space-between; gap:12px; padding: 12px 14px; border-bottom: 1px solid var(--line); background:#fbfcfe; }\n"
+          "    .cycle-body { padding: 14px; display: grid; gap: 14px; }\n"
+          "    .events { width: 100%; border-collapse: collapse; }\n"
+          "    .events th, .events td { padding: 7px 8px; border-bottom: 1px solid #eef1f5; text-align: left; vertical-align: top; }\n"
+          "    .events th { color: var(--muted); font-size: 12px; font-weight: 700; background: #fbfcfe; }\n"
+          "    .tag { display:inline-block; min-width:72px; text-align:center; padding:2px 7px; border-radius:999px; font-size:12px; font-weight:700; background:#eef4ff; color:#194185; }\n"
+          "    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }\n"
+          "    .resource { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }\n",
+          report->file);
+    fputs("    .resource strong { display:block; margin-bottom:8px; }\n"
+          "    .slots { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; }\n"
+          "    .slot { min-height:38px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:6px; background:#f8fafc; font-weight:700; }\n"
+          "    .busy { background:#e8f1ff; border-color:#b7d4ff; color:#0b4a8b; }\n"
+          "    .queues { display:flex; flex-wrap:wrap; gap:8px; }\n"
+          "    .queue { padding:6px 9px; border-radius:6px; background:#f8fafc; border:1px solid var(--line); }\n"
+          "    .memory { display:flex; min-height:42px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }\n"
+          "    .block { min-width:70px; padding:7px 8px; border-right:1px solid rgba(255,255,255,.7); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; }\n"
+          "    .free { background:#edf2f7; color:#475467; }\n"
+          "    .used { background:#dbeafe; color:#0b4a8b; }\n"
+          "    .final { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; }\n"
+          "    table.processes { width:100%; border-collapse: collapse; }\n"
+          "    table.processes th, table.processes td { padding:8px; border-bottom:1px solid #eef1f5; text-align:left; }\n"
+          "    .priority-rt { color: var(--rt); font-weight:700; }\n"
+          "    .priority-user { color: var(--user); font-weight:700; }\n"
+          "    @media (max-width: 700px) { header { padding:14px 16px; } main { padding:16px; } .controls { top:86px; } input[type=range] { width:100%; } .control-group.timeline { flex:1 1 100%; } }\n"
+          "  </style>\n"
+          "</head>\n"
+          "<body>\n",
+          report->file);
     fprintf(report->file,
-            "<!doctype html>\n"
-            "<html lang=\"pt-BR\">\n"
-            "<head>\n"
-            "  <meta charset=\"utf-8\">\n"
-            "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-            "  <title>Resultado da Simulacao</title>\n"
-            "  <style>\n"
-            "    :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --line:#d9dee7; --text:#172033; --muted:#667085; --accent:#1f6feb; --ok:#1a7f37; --warn:#b45309; --rt:#7c3aed; --user:#0f766e; }\n"
-            "    * { box-sizing: border-box; }\n"
-            "    body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); }\n"
-            "    header { position: sticky; top: 0; z-index: 2; background: #101828; color: white; padding: 18px 28px; box-shadow: 0 2px 12px rgba(15,23,42,.2); }\n"
-            "    h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: 0; }\n"
-            "    h2 { margin: 0 0 14px; font-size: 18px; }\n"
-            "    h3 { margin: 18px 0 8px; font-size: 14px; color: var(--muted); text-transform: uppercase; }\n"
-            "    main { padding: 24px 28px 40px; max-width: 1280px; margin: 0 auto; }\n"
-            "    .summary { display: flex; flex-wrap: wrap; gap: 10px; }\n"
-            "    .pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: #e5e7eb; }\n"
-            "    .cycle { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 18px; overflow: hidden; }\n"
-            "    .cycle-title { display:flex; justify-content:space-between; gap:12px; padding: 12px 14px; border-bottom: 1px solid var(--line); background:#fbfcfe; }\n"
-            "    .cycle-body { padding: 14px; display: grid; gap: 14px; }\n"
-            "    .events { width: 100%%; border-collapse: collapse; }\n"
-            "    .events th, .events td { padding: 7px 8px; border-bottom: 1px solid #eef1f5; text-align: left; vertical-align: top; }\n"
-            "    .events th { color: var(--muted); font-size: 12px; font-weight: 700; background: #fbfcfe; }\n"
-            "    .tag { display:inline-block; min-width:72px; text-align:center; padding:2px 7px; border-radius:999px; font-size:12px; font-weight:700; background:#eef4ff; color:#194185; }\n"
-            "    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }\n"
-            "    .resource { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }\n"
-            "    .resource strong { display:block; margin-bottom:8px; }\n"
-            "    .slots { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; }\n"
-            "    .slot { min-height:38px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:6px; background:#f8fafc; font-weight:700; }\n"
-            "    .busy { background:#e8f1ff; border-color:#b7d4ff; color:#0b4a8b; }\n"
-            "    .queues { display:flex; flex-wrap:wrap; gap:8px; }\n"
-            "    .queue { padding:6px 9px; border-radius:6px; background:#f8fafc; border:1px solid var(--line); }\n"
-            "    .memory { display:flex; min-height:42px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }\n"
-            "    .block { min-width:70px; padding:7px 8px; border-right:1px solid rgba(255,255,255,.7); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; }\n"
-            "    .free { background:#edf2f7; color:#475467; }\n"
-            "    .used { background:#dbeafe; color:#0b4a8b; }\n"
-            "    .final { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; }\n"
-            "    table.processes { width:100%%; border-collapse: collapse; }\n"
-            "    table.processes th, table.processes td { padding:8px; border-bottom:1px solid #eef1f5; text-align:left; }\n"
-            "    .priority-rt { color: var(--rt); font-weight:700; }\n"
-            "    .priority-user { color: var(--user); font-weight:700; }\n"
-            "  </style>\n"
-            "</head>\n"
-            "<body>\n"
             "<header>\n"
             "  <h1>Resultado da Simulacao</h1>\n"
             "  <div class=\"summary\">\n"
@@ -120,6 +134,31 @@ static void html_write_header(HtmlReport *report, const ProcessList *processes)
             SYSTEM_DISK_COUNT,
             SYSTEM_MEMORY_MB,
             USER_QUANTUM);
+
+    fputs("<section class=\"controls\" aria-label=\"Controles da simulacao\">\n"
+          "  <div class=\"control-group\">\n"
+          "    <button type=\"button\" id=\"firstCycle\" title=\"Primeiro ciclo\">|&lt;</button>\n"
+          "    <button type=\"button\" id=\"prevCycle\" title=\"Ciclo anterior\">&lt;</button>\n"
+          "    <button type=\"button\" id=\"playPause\" title=\"Reproduzir ou pausar\">Play</button>\n"
+          "    <button type=\"button\" id=\"nextCycle\" title=\"Proximo ciclo\">&gt;</button>\n"
+          "    <button type=\"button\" id=\"lastCycle\" title=\"Ultimo ciclo\">&gt;|</button>\n"
+          "  </div>\n"
+          "  <div class=\"control-group timeline\">\n"
+          "    <span id=\"cycleReadout\" class=\"cycle-readout\">Ciclo 0/0</span>\n"
+          "    <input id=\"cycleSlider\" type=\"range\" min=\"0\" value=\"0\" step=\"1\">\n"
+          "  </div>\n"
+          "  <div class=\"control-group\">\n"
+          "    <label for=\"speedSelect\">Velocidade</label>\n"
+          "    <select id=\"speedSelect\">\n"
+          "      <option value=\"1500\">0.5x</option>\n"
+          "      <option value=\"900\" selected>1x</option>\n"
+          "      <option value=\"450\">2x</option>\n"
+          "      <option value=\"180\">5x</option>\n"
+          "    </select>\n"
+          "    <button type=\"button\" id=\"toggleAll\" title=\"Mostrar ou ocultar todos os ciclos\">Todos</button>\n"
+          "  </div>\n"
+          "</section>\n",
+          report->file);
 }
 
 static void html_cycle_begin(HtmlReport *report, int time)
@@ -129,12 +168,13 @@ static void html_cycle_begin(HtmlReport *report, int time)
     }
 
     fprintf(report->file,
-            "<section class=\"cycle\">\n"
+            "<section class=\"cycle\" data-cycle=\"%d\">\n"
             "  <div class=\"cycle-title\"><h2>Ciclo %d</h2><span>t=%03d &rarr; t=%03d</span></div>\n"
             "  <div class=\"cycle-body\">\n"
             "    <table class=\"events\">\n"
             "      <thead><tr><th>Tempo</th><th>Tipo</th><th>Processo</th><th>Detalhe</th></tr></thead>\n"
             "      <tbody>\n",
+            time,
             time,
             time,
             time + 1);
@@ -265,6 +305,73 @@ static void html_cycle_end(HtmlReport *report)
     fprintf(report->file, "  </div>\n</section>\n");
 }
 
+static void html_write_interactive_script(HtmlReport *report)
+{
+    if (report == NULL || report->file == NULL) {
+        return;
+    }
+
+    fputs("<script>\n"
+          "(function () {\n"
+          "  const cycles = Array.from(document.querySelectorAll('.cycle'));\n"
+          "  if (cycles.length === 0) return;\n"
+          "  const first = document.getElementById('firstCycle');\n"
+          "  const prev = document.getElementById('prevCycle');\n"
+          "  const play = document.getElementById('playPause');\n"
+          "  const next = document.getElementById('nextCycle');\n"
+          "  const last = document.getElementById('lastCycle');\n"
+          "  const slider = document.getElementById('cycleSlider');\n"
+          "  const readout = document.getElementById('cycleReadout');\n"
+          "  const speed = document.getElementById('speedSelect');\n"
+          "  const toggleAll = document.getElementById('toggleAll');\n"
+          "  let current = 0;\n"
+          "  let timer = null;\n"
+          "  let showAll = false;\n"
+          "  slider.max = String(cycles.length - 1);\n"
+          "  function stop() {\n"
+          "    if (timer !== null) window.clearInterval(timer);\n"
+          "    timer = null;\n"
+          "    play.textContent = 'Play';\n"
+          "    play.classList.remove('active');\n"
+          "  }\n"
+          "  function render() {\n"
+          "    cycles.forEach((cycle, index) => { cycle.hidden = !showAll && index !== current; });\n"
+          "    slider.value = String(current);\n"
+          "    readout.textContent = 'Ciclo ' + (current + 1) + '/' + cycles.length;\n"
+          "    toggleAll.classList.toggle('active', showAll);\n"
+          "  }\n"
+          "  function go(index) {\n"
+          "    current = Math.max(0, Math.min(cycles.length - 1, index));\n"
+          "    render();\n"
+          "  }\n"
+          "  function start() {\n"
+          "    if (timer !== null) return;\n"
+          "    showAll = false;\n"
+          "    render();\n"
+          "    play.textContent = 'Pause';\n"
+          "    play.classList.add('active');\n"
+          "    timer = window.setInterval(() => {\n"
+          "      if (current >= cycles.length - 1) {\n"
+          "        stop();\n"
+          "        return;\n"
+          "      }\n"
+          "      go(current + 1);\n"
+          "    }, Number(speed.value));\n"
+          "  }\n"
+          "  first.addEventListener('click', () => { stop(); go(0); });\n"
+          "  prev.addEventListener('click', () => { stop(); go(current - 1); });\n"
+          "  next.addEventListener('click', () => { stop(); go(current + 1); });\n"
+          "  last.addEventListener('click', () => { stop(); go(cycles.length - 1); });\n"
+          "  play.addEventListener('click', () => { timer === null ? start() : stop(); });\n"
+          "  speed.addEventListener('change', () => { if (timer !== null) { stop(); start(); } });\n"
+          "  slider.addEventListener('input', () => { stop(); go(Number(slider.value)); });\n"
+          "  toggleAll.addEventListener('click', () => { stop(); showAll = !showAll; render(); });\n"
+          "  render();\n"
+          "}());\n"
+          "</script>\n",
+          report->file);
+}
+
 static void html_write_footer(HtmlReport *report, const ProcessList *processes, int final_time)
 {
     if (report == NULL || report->file == NULL) {
@@ -300,9 +407,9 @@ static void html_write_footer(HtmlReport *report, const ProcessList *processes, 
             "    </tbody>\n"
             "  </table>\n"
             "</section>\n"
-            "</main>\n"
-            "</body>\n"
-            "</html>\n");
+            "</main>\n");
+    html_write_interactive_script(report);
+    fprintf(report->file, "</body>\n</html>\n");
 }
 
 static void log_transition(SingleThreadSystem *system,

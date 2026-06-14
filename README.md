@@ -57,7 +57,7 @@ make report
 ```
 
 Compila o projeto, se necessario, executa o simulador e gera o
-relatorio HTML `resultado.html`.
+relatorio HTML interativo `resultado.html`.
 
 ```sh
 make report_basic
@@ -95,6 +95,10 @@ Para gerar um relatorio HTML:
 ```sh
 ./simulador examples/processos.txt --html resultado.html
 ```
+
+O relatório HTML é autocontido e permite navegar ciclo a ciclo, reproduzir a
+simulação automaticamente, ajustar a velocidade e alternar entre um ciclo por
+vez ou todos os ciclos.
 
 ## Entrada
 

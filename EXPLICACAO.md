@@ -212,7 +212,7 @@ Cada bloco mostra:
 
 ## Relatório HTML
 
-Além do log no terminal, o simulador pode gerar um relatório HTML estático:
+Além do log no terminal, o simulador pode gerar um relatório HTML interativo:
 
 ```sh
 ./simulador examples/processos.txt --html resultado.html
@@ -224,17 +224,19 @@ O alvo equivalente do `Makefile` é:
 make report
 ```
 
-O arquivo `resultado.html` é autocontido: ele inclui HTML e CSS no próprio
-arquivo, sem depender de servidor, framework web ou biblioteca externa.
+O arquivo `resultado.html` é autocontido: ele inclui HTML, CSS e JavaScript no
+próprio arquivo, sem depender de servidor, framework web ou biblioteca externa.
 
 O relatório mostra:
 
 - cabeçalho com quantidade de processos, CPUs, discos, memória e quantum;
+- controles para avançar/voltar ciclo, reproduzir automaticamente, alterar a
+  velocidade, usar slider de ciclo e alternar entre um ciclo por vez ou todos;
 - uma seção por ciclo da simulação;
 - tabela de eventos por ciclo;
 - snapshot das CPUs;
 - snapshot dos discos;
-- tamanho das filas;
+- tamanho e PIDs das filas;
 - barra visual da memória por blocos;
 - tabela final com os processos e seus estados finais.
 
