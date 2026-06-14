@@ -1,7 +1,66 @@
-# Formato oficial: [id, cpu1, io, cpu2, memoria_mb]
+# Carga significativa para validacao do simulador.
+# Mistura o formato oficial do enunciado com os formatos estendidos.
+#
+# Formato oficial:
+# [id, cpu1, io, cpu2, memoria_mb]
+#
+# Formato estendido:
+# id prioridade chegada cpu1 io cpu2 memoria_mb discos
+#
+# Prioridade: 0 = tempo real, 1 = usuario.
+
+# Exemplos oficiais do enunciado.
 [7, 4, 2, 4, 800]
 [12, 10, 4, 8, 1200]
 [5, 15, 0, 0, 512]
 
-# Formato com prioridade: id prioridade cpu1 io cpu2 memoria_mb
-21 0 3 0 0 512
+# Tempo real: apenas CPU e ate 512 MiB.
+21 0 0 3 0 0 512 0
+22 0 1 5 0 0 256 0
+23 0 1 2 0 0 128 0
+24 0 8 6 0 0 512 0
+25 0 14 4 0 0 384 0
+26 0 22 3 0 0 256 0
+
+# Usuarios chegando em rajadas: CPU-bound, I/O e segunda fase de CPU.
+100 1 0 6 6 4 2048 2
+101 1 0 12 0 0 4096 0
+102 1 1 3 5 3 1536 1
+103 1 1 8 0 0 1024 0
+104 1 2 5 3 6 3072 1
+105 1 2 18 0 0 6144 0
+106 1 3 4 7 5 2048 2
+107 1 3 9 4 2 1024 1
+108 1 4 2 8 4 3584 1
+109 1 5 14 0 0 2048 0
+110 1 5 6 6 6 4096 2
+111 1 6 5 2 3 512 1
+112 1 6 11 0 0 8192 0
+113 1 7 3 5 8 1536 1
+114 1 7 7 4 7 2048 2
+115 1 8 20 0 0 1024 0
+116 1 9 4 9 4 2048 1
+117 1 9 13 0 0 3072 0
+118 1 10 6 3 2 5120 1
+119 1 10 5 6 5 1024 2
+120 1 11 16 0 0 4096 0
+121 1 12 4 4 4 2048 1
+122 1 12 8 5 8 2048 2
+123 1 13 3 7 3 1024 1
+124 1 13 10 0 0 6144 0
+125 1 14 5 5 5 3072 1
+126 1 15 7 2 6 2048 1
+127 1 15 9 0 0 1024 0
+128 1 16 4 8 4 4096 2
+129 1 17 12 0 0 2048 0
+130 1 18 6 6 6 1536 1
+131 1 18 3 4 3 1024 1
+132 1 19 15 0 0 8192 0
+133 1 20 5 5 5 2048 2
+134 1 21 4 3 4 1024 1
+135 1 22 10 0 0 4096 0
+136 1 23 2 6 2 512 1
+137 1 24 7 7 7 3072 2
+138 1 25 11 0 0 2048 0
+139 1 26 5 4 5 1536 1
+140 1 27 8 8 4 4096 2

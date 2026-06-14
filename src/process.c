@@ -180,14 +180,23 @@ int process_list_load(ProcessList *list, const char *path)
             return -1;
         }
 
-        if (arrival_time < 0 || cpu1_time < 0 || io_time < 0 || cpu2_time < 0 ||
-            memory_mb <= 0 || requested_disks < 0 || requested_disks > SYSTEM_DISK_COUNT) {
+        if (arrival_time < 0 || cpu1_time <= 0 || io_time < 0 || cpu2_time < 0 ||
+            memory_mb <= 0 || memory_mb > SYSTEM_MEMORY_MB || requested_disks < 0 ||
+            requested_disks > SYSTEM_DISK_COUNT) {
             fprintf(stderr, "Linha %d invalida: valores fora do dominio.\n", line_number);
             fclose(file);
             return -1;
         }
-        if (priority == PROCESS_REAL_TIME && memory_mb > 512) {
-            fprintf(stderr, "Linha %d invalida: tempo real usa no maximo 512 MiB.\n", line_number);
+        if (io_time > 0 && requested_disks == 0) {
+            fprintf(stderr, "Linha %d invalida: processo com I/O deve solicitar disco.\n", line_number);
+            fclose(file);
+            return -1;
+        }
+        if (priority == PROCESS_REAL_TIME &&
+            (memory_mb > 512 || io_time > 0 || cpu2_time > 0 || requested_disks > 0)) {
+            fprintf(stderr,
+                    "Linha %d invalida: tempo real usa apenas CPU e ate 512 MiB.\n",
+                    line_number);
             fclose(file);
             return -1;
         }
@@ -207,6 +216,7 @@ int process_list_load(ProcessList *list, const char *path)
             .quantum_remaining = USER_QUANTUM,
             .feedback_level = 0,
             .memory_base = -1,
+            .disks_reserved = 0,
         };
 
         if (process_list_append(list, process) != 0) {

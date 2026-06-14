@@ -30,6 +30,7 @@ typedef struct {
     MemoryManager memory;
     HtmlReport *report;
     int finished_count;
+    int reserved_disks;
 } SingleThreadSystem;
 
 static const char *priority_name(ProcessPriority priority)
@@ -206,13 +207,16 @@ static void html_snapshot(HtmlReport *report, const SingleThreadSystem *system, 
             "      <span class=\"queue\">usuario1: %zu</span>\n"
             "      <span class=\"queue\">usuario2: %zu</span>\n"
             "      <span class=\"queue\">io: %zu</span>\n"
+            "      <span class=\"queue\">discos reservados: %d/%d</span>\n"
             "    </div>\n"
             "    <div class=\"memory\">\n",
             system->real_time_ready.count,
             system->user_ready[0].count,
             system->user_ready[1].count,
             system->user_ready[2].count,
-            system->io_waiting.count);
+            system->io_waiting.count,
+            system->reserved_disks,
+            SYSTEM_DISK_COUNT);
 
     for (size_t i = 0; i < system->memory.count; i++) {
         const MemoryBlock *block = &system->memory.blocks[i];
@@ -347,6 +351,20 @@ static void complete_process(SingleThreadSystem *system, int time, Process *proc
     process->remaining_time = 0;
     set_state(system, time, process, PROCESS_FINISHED);
     memory_release(&system->memory, process->id);
+    if (process->disks_reserved > 0) {
+        system->reserved_disks -= process->disks_reserved;
+        if (system->reserved_disks < 0) {
+            system->reserved_disks = 0;
+        }
+        char message[80];
+        snprintf(message,
+                 sizeof(message),
+                 "%d disco(s) liberado(s)",
+                 process->disks_reserved);
+        print_event(time, "discos", process->id, message);
+        html_event(system->report, time, "discos", process->id, message);
+        process->disks_reserved = 0;
+    }
     system->finished_count++;
     print_event(time, "memoria", process->id, "finalizado; memoria liberada");
     html_event(system->report, time, "memoria", process->id, "finalizado; memoria liberada");
@@ -370,6 +388,7 @@ static int init_system(SingleThreadSystem *system)
     memory_init(&system->memory, SYSTEM_MEMORY_MB);
     system->report = NULL;
     system->finished_count = 0;
+    system->reserved_disks = 0;
     return system->memory.blocks == NULL ? -1 : 0;
 }
 
@@ -391,28 +410,36 @@ static void admit_processes(SingleThreadSystem *system, ProcessList *processes, 
             continue;
         }
 
+        if (system->reserved_disks + process->requested_disks > SYSTEM_DISK_COUNT) {
+            continue;
+        }
+
         int base = memory_allocate(&system->memory, process->id, process->memory_mb);
         if (base < 0) {
             continue;
         }
 
         process->memory_base = base;
+        process->disks_reserved = process->requested_disks;
+        system->reserved_disks += process->disks_reserved;
         process->feedback_level = 0;
         process->quantum_remaining = USER_QUANTUM;
         set_state(system, time, process, PROCESS_READY);
-        printf("  t=%03d | %-9s | P%-3d | base=%-5d tamanho=%-5d MiB prioridade=%s\n",
+        printf("  t=%03d | %-9s | P%-3d | base=%-5d tamanho=%-5d MiB discos=%d prioridade=%s\n",
                time,
                "criacao",
                process->id,
                process->memory_base,
                process->memory_mb,
+               process->disks_reserved,
                priority_name(process->priority));
         char message[160];
         snprintf(message,
                  sizeof(message),
-                 "base=%d | tamanho=%d MiB | prioridade=%s",
+                 "base=%d | tamanho=%d MiB | discos=%d | prioridade=%s",
                  process->memory_base,
                  process->memory_mb,
+                 process->disks_reserved,
                  priority_name(process->priority));
         html_event(system->report, time, "criacao", process->id, message);
 
@@ -420,6 +447,52 @@ static void admit_processes(SingleThreadSystem *system, ProcessList *processes, 
             fprintf(stderr, "Erro ao enfileirar P%d.\n", process->id);
             complete_process(system, time, process);
         }
+    }
+}
+
+static int count_free_cpus(const SingleThreadSystem *system)
+{
+    int count = 0;
+    for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
+        if (system->cpus[cpu].process == NULL) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static void preempt_user_for_real_time(SingleThreadSystem *system, int time)
+{
+    while ((size_t)count_free_cpus(system) < system->real_time_ready.count) {
+        int selected_cpu = -1;
+        for (int cpu = SYSTEM_CPU_COUNT - 1; cpu >= 0; cpu--) {
+            Process *process = system->cpus[cpu].process;
+            if (process != NULL && process->priority == PROCESS_USER) {
+                selected_cpu = cpu;
+                break;
+            }
+        }
+
+        if (selected_cpu < 0) {
+            return;
+        }
+
+        Process *process = system->cpus[selected_cpu].process;
+        system->cpus[selected_cpu].process = NULL;
+        set_state(system, time, process, PROCESS_READY);
+        if (enqueue_ready(system, process) != 0) {
+            fprintf(stderr, "Erro ao reenfileirar P%d apos preempcao.\n", process->id);
+            complete_process(system, time, process);
+            return;
+        }
+
+        char message[96];
+        snprintf(message,
+                 sizeof(message),
+                 "cpu%d liberada para processo de tempo real",
+                 selected_cpu);
+        print_event(time, "preempcao", process->id, message);
+        html_event(system->report, time, "preempcao", process->id, message);
     }
 }
 
@@ -579,6 +652,7 @@ static void tick_disks(SingleThreadSystem *system, int time)
 static void print_resources(const SingleThreadSystem *system, int time)
 {
     printf("\n  Recursos em t=%03d\n", time);
+    printf("  Discos reservados: %d/%d\n", system->reserved_disks, SYSTEM_DISK_COUNT);
     printf("  CPUs   ");
     for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
         if (system->cpus[cpu].process == NULL) {
@@ -646,6 +720,7 @@ static int run_single(ProcessList *processes, const char *html_path)
         html_cycle_begin(system.report, time);
         admit_processes(&system, processes, time);
         start_io(&system, time);
+        preempt_user_for_real_time(&system, time);
         dispatch_cpus(&system, time);
         print_resources(&system, time);
         print_queues(&system);
@@ -672,13 +747,8 @@ static int run_single(ProcessList *processes, const char *html_path)
     return 0;
 }
 
-int simulator_run(SimMode mode, const char *input_path, const char *html_path)
+int simulator_run(const char *input_path, const char *html_path)
 {
-    if (mode == SIM_MODE_MULTI) {
-        fprintf(stderr, "Modo multi ainda nao implementado.\n");
-        return 1;
-    }
-
     ProcessList processes;
     process_list_init(&processes);
 
@@ -688,7 +758,7 @@ int simulator_run(SimMode mode, const char *input_path, const char *html_path)
     }
 
     print_rule();
-    printf("Simulador de Escalonamento - modo single-thread\n");
+    printf("Simulador de Escalonamento\n");
     printf("Processos carregados: %zu | CPUs: %d | Discos: %d | Memoria: %d MiB\n",
            processes.count,
            SYSTEM_CPU_COUNT,

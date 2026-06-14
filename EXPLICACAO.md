@@ -15,6 +15,7 @@ O simulador modela, de forma discreta, um sistema com:
 - escalonamento por múltiplas filas de feedback para processos de usuário;
 - quantum de 2 unidades de tempo para processos de usuário;
 - fases de execução `CPU1`, `IO` e `CPU2`;
+- reserva exclusiva de discos solicitados pelos processos;
 - alocação real de memória por blocos, com endereço base e tamanho;
 - logs de criação, despacho, bloqueio, preempção, finalização e mapa de memória;
 - relatório HTML opcional em `resultado.html`.
@@ -38,34 +39,35 @@ Para executar o exemplo em modo single-thread:
 make run
 ```
 
+Esse alvo usa `examples/processos.txt`, uma carga de validação com 50 processos.
+Para rodar o exemplo pequeno:
+
+```sh
+make run_basic
+```
+
 Para executar o exemplo e gerar o relatório HTML:
 
 ```sh
 make report
 ```
 
+Para gerar o relatório do exemplo pequeno:
+
+```sh
+make report_basic
+```
+
 Ou diretamente:
 
 ```sh
-./simulador --modo single examples/processos.txt
+./simulador examples/processos.txt
 ```
 
 Ou diretamente com relatório:
 
 ```sh
-./simulador --modo single examples/processos.txt --html resultado.html
-```
-
-O modo multi-thread ainda não foi implementado:
-
-```sh
-./simulador --modo multi examples/processos.txt
-```
-
-Esse comando falha intencionalmente com:
-
-```text
-Modo multi ainda nao implementado.
+./simulador examples/processos.txt --html resultado.html
 ```
 
 ## Comandos Make
@@ -88,15 +90,27 @@ Compila diretamente o alvo do binário. Na prática, hoje tem o mesmo efeito de
 make run
 ```
 
-Compila o projeto, se necessário, e executa o simulador em modo `single` usando
-`examples/processos.txt`.
+Compila o projeto, se necessário, e executa o simulador usando
+`examples/processos.txt`, uma carga de validação com 50 processos.
+
+```sh
+make run_basic
+```
+
+Executa o caso pequeno em `examples/processos_basico.txt`.
 
 ```sh
 make report
 ```
 
-Compila o projeto, se necessário, executa o simulador em modo `single` usando
+Compila o projeto, se necessário, executa o simulador usando
 `examples/processos.txt` e gera o relatório `resultado.html`.
+
+```sh
+make report_basic
+```
+
+Gera o relatório HTML para o caso pequeno em `examples/processos_basico.txt`.
 
 ```sh
 make compile_commands
@@ -156,7 +170,13 @@ Prioridades:
 - `0`: processo de tempo real;
 - `1`: processo de usuário.
 
-Processos de tempo real são validados com limite máximo de 512 MiB de memória.
+No formato estendido, o campo `discos` representa a quantidade de discos
+reservados exclusivamente pelo processo durante toda a execução. Um processo com
+I/O precisa solicitar ao menos 1 disco. A admissão de processos espera até haver
+memória e discos suficientes.
+
+Processos de tempo real são validados com limite máximo de 512 MiB de memória e
+não podem solicitar I/O, segunda fase de CPU ou discos.
 
 ## Saída
 
@@ -167,7 +187,7 @@ A saída padrão no terminal é um log textual da simulação. Um trecho típico
 Ciclo 0: t=000 -> t=001
 -------------------------------------------------------------------------------
   t=000 | estado    | P7   | NEW        -> READY      | fase=CPU1 restante=4
-  t=000 | criacao   | P7   | base=512   tamanho=800   MiB prioridade=USER
+  t=000 | criacao   | P7   | base=512   tamanho=800   MiB discos=1 prioridade=USER
   t=000 | estado    | P7   | READY      -> RUNNING    | fase=CPU1 restante=4
   t=000 | despacho  | P7   | cpu2 fila=0 quantum=2
 ```
@@ -195,7 +215,7 @@ Cada bloco mostra:
 Além do log no terminal, o simulador pode gerar um relatório HTML estático:
 
 ```sh
-./simulador --modo single examples/processos.txt --html resultado.html
+./simulador examples/processos.txt --html resultado.html
 ```
 
 O alvo equivalente do `Makefile` é:
@@ -230,7 +250,9 @@ Processos com prioridade `0` entram na fila de tempo real.
 
 Eles têm precedência sobre processos de usuário e são escalonados em ordem FCFS.
 No modo atual, eles não usam quantum. Depois que entram em uma CPU, executam até
-terminar a fase de CPU atual.
+terminar a fase de CPU atual. Se um processo de tempo real chega enquanto todas
+as CPUs estão ocupadas por usuários, um usuário é preemptado no limite do ciclo
+para liberar CPU.
 
 ### Processos De Usuário
 
@@ -257,6 +279,17 @@ Quando termina I/O:
 ## Memória
 
 A memória é implementada em `src/memory.c`.
+
+## Recursos De Disco
+
+Discos são tratados em dois níveis:
+
+- reserva: feita na admissão, usando o campo `discos` do descritor estendido;
+- atividade de I/O: mostrada nos slots `d0` a `d3` enquanto o processo está na
+  fase de I/O.
+
+A reserva impede que mais de 4 discos sejam comprometidos ao mesmo tempo, mesmo
+quando alguns processos reservados ainda não estão executando I/O naquele ciclo.
 
 O gerenciador mantém uma lista dinâmica de blocos:
 
@@ -287,7 +320,8 @@ fragmentação externa.
 ├── README.md
 ├── EXPLICACAO.md
 ├── examples/
-│   └── processos.txt
+│   ├── processos.txt
+│   └── processos_basico.txt
 ├── include/
 │   ├── memory.h
 │   ├── process.h
@@ -308,11 +342,11 @@ Responsável pela interface de linha de comando.
 Ele valida o formato:
 
 ```sh
-./simulador --modo <single|multi> <arquivo> [--html resultado.html]
+./simulador <arquivo> [--html resultado.html]
 ```
 
-Depois converte o modo textual para `SIM_MODE_SINGLE` ou `SIM_MODE_MULTI`, lê o
-caminho opcional do relatório HTML e chama `simulator_run`.
+Lê o caminho de entrada e o caminho opcional do relatório HTML e chama
+`simulator_run`.
 
 ### `include/simulator.h`
 
@@ -325,10 +359,10 @@ Define constantes globais do sistema:
 #define USER_QUANTUM 2
 ```
 
-Também declara o enum `SimMode` e a função pública:
+Também declara a função pública:
 
 ```c
-int simulator_run(SimMode mode, const char *input_path, const char *html_path);
+int simulator_run(const char *input_path, const char *html_path);
 ```
 
 ### `include/process.h` E `src/process.c`
@@ -343,6 +377,7 @@ mutável da simulação:
 - `arrival_time`;
 - tempos de `CPU1`, `IO` e `CPU2`;
 - memória solicitada;
+- discos solicitados e reservados;
 - estado atual;
 - fase atual;
 - tempo restante da fase;
@@ -419,6 +454,7 @@ A estrutura principal é `SingleThreadSystem`, que agrupa:
 - 4 slots de CPU;
 - 4 slots de disco;
 - gerenciador de memória;
+- contador de discos reservados;
 - ponteiro opcional para o relatório HTML;
 - contador de processos finalizados.
 
@@ -429,6 +465,7 @@ while (system.finished_count < (int)processes->count) {
     html_cycle_begin(system.report, time);
     admit_processes(&system, processes, time);
     start_io(&system, time);
+    preempt_user_for_real_time(&system, time);
     dispatch_cpus(&system, time);
     print_resources(&system, time);
     print_queues(&system);
@@ -464,7 +501,7 @@ O fluxo geral é:
 ```text
 NEW
   |
-  | chegada + memória disponível
+  | chegada + memória e discos disponíveis
   v
 READY
   |
@@ -492,25 +529,37 @@ FINISHED
 Processos de usuário podem voltar de `RUNNING` para `READY` quando o quantum
 acaba.
 
-## Limitações Atuais
+## Threads
 
-- O modo `multi` ainda não foi implementado.
-- O campo `requested_disks` é lido e validado, mas o modo single atual usa a fila
-  de I/O com até 4 discos disponíveis, sem reservar múltiplos discos por processo.
-- Não há suíte automatizada de testes ainda.
-- O escalonamento é determinístico e discreto; o programa não tenta executar
-  processos reais.
-- O relatório HTML ainda é estático. Ele não possui filtros, busca ou controles
-  interativos por enquanto.
+O enunciado faz uma pergunta dissertativa:
 
-## Próximos Passos Sugeridos
+> "Em relação ao simulador, como este poderia ser beneficiado com a
+> implementação do simulador com mais de uma thread?"
 
-1. Separar parte do núcleo de `src/simulator.c` em funções reutilizáveis entre
-   `single` e `multi`.
-2. Implementar o modo `multi` com `pthread`.
-3. Proteger filas, memória e estado dos processos com mutexes.
-4. Usar semáforos ou variáveis de condição para acordar CPUs/discos quando houver
-   trabalho disponível.
-5. Adicionar testes para parser, memória e transições principais de estado.
-6. Melhorar o relatório HTML com filtros por processo, busca por estado e opção
-   de ocultar ciclos sem eventos.
+O simulador desta entrega é single-thread e avança o tempo de forma discreta: a
+cada unidade de tempo o laço principal admite processos, inicia I/O, despacha
+CPUs e consome uma unidade de cada recurso ocupado. Tudo isso é serializado em
+um único fluxo de execução.
+
+O simulador poderia se beneficiar de múltiplas threads das seguintes formas:
+
+- **Paralelismo real dos recursos.** Cada uma das 4 CPUs e cada um dos 4 discos
+  poderia ser uma thread independente, executando de verdade ao mesmo tempo, em
+  vez de o laço único processar um recurso após o outro a cada tique. Em uma
+  máquina multicore isso aproveitaria os núcleos físicos e modelaria com mais
+  fidelidade o fato de o sistema ter 4 CPUs e 4 discos operando em paralelo.
+- **Dispatcher reativo.** Uma thread escalonadora poderia dormir enquanto não há
+  trabalho e ser acordada por semáforos ou variáveis de condição quando um
+  processo chega à fila de prontos ou quando um recurso fica livre, eliminando a
+  varredura ativa feita a cada unidade de tempo.
+- **I/O verdadeiramente bloqueante.** O bloqueio em disco deixaria de ser
+  simulado por contagem de tiques e passaria a ser um bloqueio real da thread,
+  liberando naturalmente a CPU para outro processo.
+
+O custo é a necessidade de sincronização: as filas de prontos, a fila de I/O, o
+gerenciador de memória e o estado de cada processo passam a ser recursos
+compartilhados e precisam ser protegidos por **mutexes** para evitar condições de
+corrida. A saída textual também precisaria ser serializada para não embaralhar
+as mensagens das várias threads. Por isso a versão atual ficou single-thread:
+ela é mais simples de raciocinar e produz uma saída determinística, o que
+facilita a validação e a correção do trabalho.

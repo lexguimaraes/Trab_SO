@@ -1,8 +1,7 @@
 # Simulador de Escalonamento
 
 Trabalho prático de Sistemas Operacionais: simulador de processos com CPUs,
-discos, memória principal, filas de prontos e modos de execução single-thread e
-multi-thread.
+discos, memória principal e filas de prontos.
 
 ## Build
 
@@ -37,15 +36,27 @@ Compila diretamente o alvo do binario. Na pratica, hoje tem o mesmo efeito de
 make run
 ```
 
-Compila o projeto, se necessario, e executa o simulador em modo `single` usando
-`examples/processos.txt`.
+Compila o projeto, se necessario, e executa o simulador usando
+`examples/processos.txt`, que contem uma carga significativa de validacao.
+
+```sh
+make run_basic
+```
+
+Executa o caso pequeno em `examples/processos_basico.txt`.
 
 ```sh
 make report
 ```
 
-Compila o projeto, se necessario, executa o simulador em modo `single` e gera o
+Compila o projeto, se necessario, executa o simulador e gera o
 relatorio HTML `resultado.html`.
+
+```sh
+make report_basic
+```
+
+Gera o relatorio HTML para o caso pequeno em `examples/processos_basico.txt`.
 
 ```sh
 make compile_commands
@@ -63,13 +74,13 @@ Remove o binario `simulador` e os arquivos objeto `src/*.o`.
 ## Execução
 
 ```sh
-./simulador --modo single examples/processos.txt
+./simulador examples/processos.txt
 ```
 
 Para gerar um relatorio HTML:
 
 ```sh
-./simulador --modo single examples/processos.txt --html resultado.html
+./simulador examples/processos.txt --html resultado.html
 ```
 
 ## Entrada
@@ -92,18 +103,31 @@ id prioridade chegada cpu1 io cpu2 memoria_mb discos
 
 Prioridade `0` representa tempo real; prioridade `1` representa usuário.
 
+No formato estendido, `discos` representa recursos reservados pelo despachante
+durante toda a vida do processo. Um processo com I/O deve solicitar ao menos 1
+disco. Processos de tempo real usam apenas CPU e memoria, com limite de 512 MiB.
+
 ## Estado Atual
 
 Implementado:
 
-- modo `single`;
 - 4 CPUs simuladas;
 - 4 discos simulados;
 - processos de tempo real em FCFS sem quantum;
 - processos de usuário com feedback de 3 filas e quantum 2;
+- preempção de usuário quando tempo real chega e todas as CPUs estão ocupadas
+  por usuários;
+- reserva exclusiva de discos durante a execução dos processos que os solicitaram;
 - memória por blocos com first-fit e junção de blocos livres;
 - logs de criação, despacho, bloqueio, preempção e finalização.
 
-O modo `multi` será implementado usando os mesmos modelos do modo `single`,
-com threads reais representando componentes do sistema, não processos do
-usuário.
+## Threads
+
+O enunciado pergunta como o simulador poderia se beneficiar de mais de uma
+thread. A resposta está detalhada em [`EXPLICACAO.md`](EXPLICACAO.md), na seção
+"Threads". Em resumo: cada CPU e cada disco poderiam virar uma thread
+independente, executando em paralelo de verdade, com uma thread escalonadora
+acordando os recursos ociosos via semáforos. Isso aproveitaria máquinas
+multicore e modelaria o paralelismo real dos 4 CPUs e 4 discos, ao custo de
+sincronizar as filas, a memória e o estado dos processos com mutexes. A versão
+atual é single-thread e discreta por simplicidade e determinismo da saída.

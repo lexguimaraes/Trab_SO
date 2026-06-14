@@ -8,7 +8,7 @@ COMPILE_DB_FILES := $(SRC) $(HEADERS)
 OBJ := $(SRC:.c=.o)
 BIN := simulador
 
-.PHONY: all clean run report compile_commands
+.PHONY: all clean run run_basic report report_basic compile_commands
 
 all: $(BIN)
 
@@ -21,10 +21,16 @@ src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(BIN)
-	./$(BIN) --modo single examples/processos.txt
+	./$(BIN) examples/processos.txt
+
+run_basic: $(BIN)
+	./$(BIN) examples/processos_basico.txt
 
 report: $(BIN)
-	./$(BIN) --modo single examples/processos.txt --html resultado.html
+	./$(BIN) examples/processos.txt --html resultado.html
+
+report_basic: $(BIN)
+	./$(BIN) examples/processos_basico.txt --html resultado.html
 
 compile_commands:
 	@printf '[\n' > compile_commands.json

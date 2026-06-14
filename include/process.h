@@ -39,6 +39,7 @@ typedef struct {
     int quantum_remaining;
     int feedback_level;
     int memory_base;
+    int disks_reserved;
 } Process;
 
 typedef struct {
