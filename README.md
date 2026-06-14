@@ -135,6 +135,10 @@ suficientes para reservar. Enquanto isso não acontece, o processo permanece em
 `proximo-ciclo` indica que os recursos já foram liberados no fim do ciclo e a
 admissão será reavaliada no início do próximo.
 
+A admissão é ordenada por chegada e, em empate, por `id`, mas não é FIFO
+bloqueante: se um processo pendente não couber nos recursos disponíveis, outro
+processo posterior que couber pode ser admitido.
+
 ## Estado Atual
 
 Implementado:
