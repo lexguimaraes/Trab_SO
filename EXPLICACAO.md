@@ -254,6 +254,11 @@ terminar a fase de CPU atual. Se um processo de tempo real chega enquanto todas
 as CPUs estão ocupadas por usuários, um usuário é preemptado no limite do ciclo
 para liberar CPU.
 
+O usuário preemptado é escolhido pelo nível de feedback: entre os usuários em
+execução, sai primeiro quem tiver o maior `feedback_level`, ou seja, a menor
+prioridade entre usuários. Em caso de empate, o simulador escolhe a CPU de maior
+índice para manter o comportamento determinístico.
+
 ### Processos De Usuário
 
 Processos com prioridade `1` usam múltiplas filas de feedback:
