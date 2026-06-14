@@ -435,7 +435,6 @@ static void admit_processes(SingleThreadSystem *system, ProcessList *processes, 
         system->reserved_disks += process->disks_reserved;
         process->feedback_level = 0;
         process->quantum_remaining = USER_QUANTUM;
-        set_state(system, time, process, PROCESS_READY);
         printf("  t=%03d | %-9s | P%-3d | base=%-5d tamanho=%-5d MiB discos=%d prioridade=%s\n",
                time,
                "criacao",
@@ -453,6 +452,7 @@ static void admit_processes(SingleThreadSystem *system, ProcessList *processes, 
                  process->disks_reserved,
                  priority_name(process->priority));
         html_event(system->report, time, "criacao", process->id, message);
+        set_state(system, time, process, PROCESS_READY);
 
         if (enqueue_ready(system, process) != 0) {
             fprintf(stderr, "Erro ao enfileirar P%d.\n", process->id);
