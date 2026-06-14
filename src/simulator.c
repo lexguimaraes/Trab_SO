@@ -162,6 +162,19 @@ static void html_transition(HtmlReport *report, int time, const Process *process
     html_event(report, time, "estado", process->id, message);
 }
 
+static void html_queue_members(HtmlReport *report, const char *name, const ProcessQueue *queue)
+{
+    fprintf(report->file, "      <span class=\"queue\">%s: %zu<br>", name, queue->count);
+    if (queue->count == 0) {
+        fprintf(report->file, "-");
+    } else {
+        for (size_t i = 0; i < queue->count; i++) {
+            fprintf(report->file, "%sP%d", i == 0 ? "" : " ", queue->items[i]->id);
+        }
+    }
+    fprintf(report->file, "</span>\n");
+}
+
 static void html_snapshot(HtmlReport *report, const SingleThreadSystem *system, int time)
 {
     if (report == NULL || report->file == NULL) {
@@ -201,20 +214,18 @@ static void html_snapshot(HtmlReport *report, const SingleThreadSystem *system, 
     fprintf(report->file,
             "</div></div>\n"
             "    </div>\n"
-            "    <div class=\"queues\">\n"
-            "      <span class=\"queue\">tempo-real: %zu</span>\n"
-            "      <span class=\"queue\">usuario0: %zu</span>\n"
-            "      <span class=\"queue\">usuario1: %zu</span>\n"
-            "      <span class=\"queue\">usuario2: %zu</span>\n"
-            "      <span class=\"queue\">io: %zu</span>\n"
+            "    <div class=\"queues\">\n");
+
+    html_queue_members(report, "tempo-real", &system->real_time_ready);
+    html_queue_members(report, "usuario0", &system->user_ready[0]);
+    html_queue_members(report, "usuario1", &system->user_ready[1]);
+    html_queue_members(report, "usuario2", &system->user_ready[2]);
+    html_queue_members(report, "io", &system->io_waiting);
+
+    fprintf(report->file,
             "      <span class=\"queue\">discos reservados: %d/%d</span>\n"
             "    </div>\n"
             "    <div class=\"memory\">\n",
-            system->real_time_ready.count,
-            system->user_ready[0].count,
-            system->user_ready[1].count,
-            system->user_ready[2].count,
-            system->io_waiting.count,
             system->reserved_disks,
             SYSTEM_DISK_COUNT);
 
@@ -678,14 +689,27 @@ static void print_resources(const SingleThreadSystem *system, int time)
     printf("|\n");
 }
 
+static void print_queue_members(const char *name, const ProcessQueue *queue)
+{
+    printf("  %-11s (%zu):", name, queue->count);
+    if (queue->count == 0) {
+        printf(" -");
+    } else {
+        for (size_t i = 0; i < queue->count; i++) {
+            printf(" P%d", queue->items[i]->id);
+        }
+    }
+    printf("\n");
+}
+
 static void print_queues(const SingleThreadSystem *system)
 {
-    printf("  Filas  | tempo-real=%zu | usuario0=%zu | usuario1=%zu | usuario2=%zu | io=%zu |\n",
-           system->real_time_ready.count,
-           system->user_ready[0].count,
-           system->user_ready[1].count,
-           system->user_ready[2].count,
-           system->io_waiting.count);
+    printf("  Filas\n");
+    print_queue_members("tempo-real", &system->real_time_ready);
+    print_queue_members("usuario0", &system->user_ready[0]);
+    print_queue_members("usuario1", &system->user_ready[1]);
+    print_queue_members("usuario2", &system->user_ready[2]);
+    print_queue_members("io", &system->io_waiting);
 }
 
 static int run_single(ProcessList *processes, const char *html_path)
