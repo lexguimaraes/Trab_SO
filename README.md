@@ -98,7 +98,8 @@ Para gerar um relatorio HTML:
 
 O relatório HTML é autocontido e permite navegar ciclo a ciclo, reproduzir a
 simulação automaticamente, ajustar a velocidade e alternar entre um ciclo por
-vez ou todos os ciclos.
+vez ou todos os ciclos. Nos snapshots, os slots de CPU mostram processo, fase,
+tempo restante e quantum; os slots de disco mostram o tempo restante de I/O.
 
 ## Entrada
 

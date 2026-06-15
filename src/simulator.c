@@ -99,7 +99,8 @@ static void html_write_header(HtmlReport *report, const ProcessList *processes)
           report->file);
     fputs("    .resource strong { display:block; margin-bottom:8px; }\n"
           "    .slots { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; }\n"
-          "    .slot { min-height:38px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:6px; background:#f8fafc; font-weight:700; }\n"
+          "    .slot { min-height:64px; padding:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:6px; background:#f8fafc; font-weight:700; text-align:center; line-height:1.25; }\n"
+          "    .slot .metric { font-size:11px; font-weight:600; color:var(--muted); }\n"
           "    .busy { background:#e8f1ff; border-color:#b7d4ff; color:#0b4a8b; }\n"
           "    .queues { display:flex; flex-wrap:wrap; gap:8px; }\n"
           "    .queue { padding:6px 9px; border-radius:6px; background:#f8fafc; border:1px solid var(--line); }\n"
@@ -282,6 +283,43 @@ static void html_admission_pending(HtmlReport *report,
     fprintf(report->file, "</span>\n");
 }
 
+static void html_cpu_slot(HtmlReport *report, int cpu, const Process *process)
+{
+    if (process == NULL) {
+        fprintf(report->file, "<div class=\"slot\">cpu%d<br>livre</div>", cpu);
+        return;
+    }
+
+    fprintf(report->file,
+            "<div class=\"slot busy\">cpu%d<br>P%d<br><span class=\"metric\">%s restante=%d</span><br>",
+            cpu,
+            process->id,
+            process_phase_name(process->phase),
+            process->remaining_time);
+    if (process->priority == PROCESS_USER) {
+        fprintf(report->file,
+                "<span class=\"metric\">q=%d</span></div>",
+                process->quantum_remaining);
+    } else {
+        fprintf(report->file, "<span class=\"metric\">q=-</span></div>");
+    }
+}
+
+static void html_disk_slot(HtmlReport *report, int disk, const Process *process)
+{
+    if (process == NULL) {
+        fprintf(report->file, "<div class=\"slot\">d%d<br>livre</div>", disk);
+        return;
+    }
+
+    fprintf(report->file,
+            "<div class=\"slot busy\">d%d<br>P%d<br><span class=\"metric\">%s restante=%d</span></div>",
+            disk,
+            process->id,
+            process_phase_name(process->phase),
+            process->remaining_time);
+}
+
 static void html_snapshot(HtmlReport *report,
                           const SingleThreadSystem *system,
                           const ProcessList *processes,
@@ -299,12 +337,7 @@ static void html_snapshot(HtmlReport *report,
             time);
 
     for (int cpu = 0; cpu < SYSTEM_CPU_COUNT; cpu++) {
-        const Process *process = system->cpus[cpu].process;
-        if (process == NULL) {
-            fprintf(report->file, "<div class=\"slot\">cpu%d<br>livre</div>", cpu);
-        } else {
-            fprintf(report->file, "<div class=\"slot busy\">cpu%d<br>P%d</div>", cpu, process->id);
-        }
+        html_cpu_slot(report, cpu, system->cpus[cpu].process);
     }
 
     fprintf(report->file,
@@ -313,12 +346,7 @@ static void html_snapshot(HtmlReport *report,
             time);
 
     for (int disk = 0; disk < SYSTEM_DISK_COUNT; disk++) {
-        const Process *process = system->disks[disk].process;
-        if (process == NULL) {
-            fprintf(report->file, "<div class=\"slot\">d%d<br>livre</div>", disk);
-        } else {
-            fprintf(report->file, "<div class=\"slot busy\">d%d<br>P%d</div>", disk, process->id);
-        }
+        html_disk_slot(report, disk, system->disks[disk].process);
     }
 
     fprintf(report->file,

@@ -250,8 +250,8 @@ O relatório mostra:
   velocidade, usar slider de ciclo e alternar entre um ciclo por vez ou todos;
 - uma seção por ciclo da simulação;
 - tabela de eventos por ciclo;
-- snapshot das CPUs;
-- snapshot dos discos;
+- snapshot das CPUs, com fase, tempo restante e quantum;
+- snapshot dos discos, com tempo restante de I/O;
 - tamanho e PIDs das filas;
 - processos pendentes de admissão e o recurso que falta;
 - barra visual da memória por blocos;
@@ -272,6 +272,8 @@ Glossário rápido do relatório:
   ainda não estejam executando I/O naquele ciclo;
 - `fase=CPU1`, `fase=IO`, `fase=CPU2`: etapa atual do processo;
 - `restante`: tempo restante da fase atual, não do processo inteiro;
+- `q`: quantum restante do processo de usuário na CPU; processos de tempo real
+  aparecem com `q=-`, pois não usam quantum;
 - `proximo-ciclo`: processo ainda aparece em `NEW`, mas os recursos já ficaram
   disponíveis no fim do ciclo e a admissão será reavaliada no início do próximo.
 
